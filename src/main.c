@@ -1,7 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
+
+#define MAX_ARGS 100
 
 int main(int argc, char *argv[]) {
     // Flush after every printf
@@ -59,7 +63,27 @@ int main(int argc, char *argv[]) {
             if (!found)
                 printf("%s: not found\n", type_cmd);
         } else {
-            printf("%s: command not found\n", command);
+            char *command_args[MAX_ARGS];
+            int arg_count = 0;
+
+            char *token = strtok(command, " ");
+            while (token != NULL && arg_count < MAX_ARGS - 1) {
+                command_args[arg_count++] = token;
+                token = strtok(NULL, " ");
+            }
+            command_args[arg_count] = NULL;
+
+            pid_t child = fork();
+
+            if (child == 0) {
+                execvp(command_args[0], command_args);
+
+                // only runs if execvp fails
+                printf("%s: command not found\n", command_args[0]);
+                exit(EXIT_FAILURE);
+            } else if (child > 0) {
+                wait(NULL);
+            }
         }
     }
 
