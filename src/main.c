@@ -50,6 +50,15 @@ int handle_builtin(char *command, char **builtin_commands) {
         return 1;
     }
 
+    if (strncmp(command, "cd ", 3) == 0) {
+        const char *path = command + 3;
+        if (chdir(path) != 0) {
+            printf("cd: %s: No such file or directory\n", path);
+            return 1;
+        }
+        return 1;
+    }
+
     if (strncmp(command, "type ", 5) == 0) {
         char *type_cmd = command + 5;
 
