@@ -39,6 +39,17 @@ int handle_builtin(char *command, char **builtin_commands) {
         return 1;
     }
 
+    if (strcmp(command, "pwd") == 0) {
+        char cur_dir[256];
+        if (getcwd(cur_dir, sizeof(cur_dir)) == NULL) {
+            perror("pwd failed");
+            return 0;
+        }
+
+        printf("%s\n", cur_dir);
+        return 1;
+    }
+
     if (strncmp(command, "type ", 5) == 0) {
         char *type_cmd = command + 5;
 
@@ -89,7 +100,7 @@ int main(int argc, char *argv[]) {
     // Flush after every printf
     setbuf(stdout, NULL);
 
-    char *builtin_commands[] = {"echo", "exit", "type", NULL};
+    char *builtin_commands[] = {"echo", "exit", "type", "pwd", NULL};
     while (1) {
         printf("$ ");
         char command[256];
