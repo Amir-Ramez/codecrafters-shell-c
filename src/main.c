@@ -51,7 +51,31 @@ int handle_builtin(char *command, char **builtin_commands) {
     }
 
     if (strncmp(command, "cd ", 3) == 0) {
-        const char *path = command + 3;
+        char *path = command + 3;
+
+        while (*path == ' ')
+            path++;
+
+        if (*path == '\0') {
+            path = getenv("HOME");
+            if (path == NULL) {
+                fprintf(stderr, "cd: HOME not set\n");
+                return 1;
+            }
+        }
+
+        char expanded_path[256];
+        if (*path == '~') {
+            const char *home = getenv("HOME");
+            if (home == NULL) {
+                fprintf(stderr, "cd: HOME not set for ~ expansion\n");
+                return 1;
+            }
+
+            snprintf(expanded_path, sizeof(expanded_path), "%s%s", home, path + 1);
+            path = expanded_path;
+        }
+
         if (chdir(path) != 0) {
             printf("cd: %s: No such file or directory\n", path);
             return 1;
