@@ -1,3 +1,5 @@
+#include <ctype.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,14 +10,41 @@
 #define MAX_ARGS 100
 
 void parse_command(char *command, char **args) {
-    char *token = strtok(command, " ");
+    int args_count = 0;
+    int in_quotes = 0;
+    char cur_arg[256];
+    int arg_pos = 0;
 
-    int i = 0;
-    while (token != NULL && i < MAX_ARGS - 1) {
-        args[i++] = token;
-        token = strtok(NULL, " ");
+    for (size_t i = 0; command[i] != '\0'; ++i) {
+        char c = command[i];
+        if (c == '\'') {
+            in_quotes = !in_quotes;
+            continue;
+        }
+
+        if (in_quotes) {
+            if (arg_pos < 255)
+                cur_arg[arg_pos++] = c;
+        } else {
+            if (isblank(c)) {
+                if (arg_pos > 0) {
+                    cur_arg[arg_pos] = '\0';
+                    args[args_count++] = strdup(cur_arg);
+                    arg_pos = 0;
+                }
+            } else {
+                if (arg_pos < 255)
+                    cur_arg[arg_pos++] = c;
+            }
+        }
     }
-    args[i] = NULL;
+
+    if (arg_pos > 0) {
+        cur_arg[arg_pos] = '\0';
+        args[args_count++] = strdup(cur_arg);
+    }
+
+    args[args_count] = NULL;
 }
 
 void execute_command(char **args) {
@@ -30,16 +59,21 @@ void execute_command(char **args) {
     }
 }
 
-int handle_builtin(char *command, char **builtin_commands) {
-    if (strcmp(command, "exit") == 0)
+int handle_builtin(char **args, char **builtin_commands) {
+    if (strcmp(args[0], "exit") == 0)
         exit(EXIT_SUCCESS);
 
-    if (strncmp(command, "echo ", 5) == 0) {
-        printf("%s\n", command + 5);
+    if (strcmp(args[0], "echo") == 0) {
+        for (size_t i = 1; args[i] != NULL; ++i) {
+            printf("%s", args[i]);
+            if (args[i + 1] != NULL)
+                printf(" ");
+        }
+        printf("\n");
         return 1;
     }
 
-    if (strcmp(command, "pwd") == 0) {
+    if (strcmp(args[0], "pwd") == 0) {
         char cur_dir[256];
         if (getcwd(cur_dir, sizeof(cur_dir)) == NULL) {
             perror("pwd failed");
@@ -50,13 +84,10 @@ int handle_builtin(char *command, char **builtin_commands) {
         return 1;
     }
 
-    if (strncmp(command, "cd ", 3) == 0) {
-        char *path = command + 3;
+    if (strcmp(args[0], "cd") == 0) {
+        char *path = args[1];
 
-        while (*path == ' ')
-            path++;
-
-        if (*path == '\0') {
+        if (path == NULL) {
             path = getenv("HOME");
             if (path == NULL) {
                 fprintf(stderr, "cd: HOME not set\n");
@@ -83,8 +114,8 @@ int handle_builtin(char *command, char **builtin_commands) {
         return 1;
     }
 
-    if (strncmp(command, "type ", 5) == 0) {
-        char *type_cmd = command + 5;
+    if (strcmp(args[0], "type") == 0) {
+        char *type_cmd = args[1];
 
         int is_builtin = 0;
         for (int i = 0; builtin_commands[i] != NULL; ++i) {
@@ -140,12 +171,23 @@ int main(int argc, char *argv[]) {
         fgets(command, sizeof(command), stdin);
         command[strcspn(command, "\n")] = '\0';
 
-        if (handle_builtin(command, builtin_commands))
-            continue;
-
         char *args[MAX_ARGS];
         parse_command(command, args);
+
+        if (handle_builtin(args, builtin_commands)) {
+            for (size_t i = 0; args[i] != NULL; ++i) {
+                free(args[i]);
+                args[i] = NULL;
+            }
+            continue;
+        }
+
         execute_command(args);
+
+        for (size_t i = 0; args[i] != NULL; ++i) {
+            free(args[i]);
+            args[i] = NULL;
+        }
     }
 
     return 0;
